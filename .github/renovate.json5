@@ -1,0 +1,17 @@
+{
+    "customManagers": [
+        {
+            "customType": "regex",
+            "managerFilePatterns": [
+                "/^\\.github\\/UPSTREAM_SHA$/"
+            ],
+            "matchStrings": [
+                "^(?<currentDigest>[a-f0-9]{40})\\n?$"
+            ],
+            "depNameTemplate": "upstream-sha",
+            "packageNameTemplate": "https://github.com/withastro/astro",
+            "currentValueTemplate": "examples/minimal",
+            "datasourceTemplate": "git-refs"
+        }
+    ]
+}

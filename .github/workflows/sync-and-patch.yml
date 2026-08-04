@@ -1,0 +1,68 @@
+name: Sync and patch
+
+on:
+  pull_request:
+    branches:
+      - sync
+    paths:
+      - '.github/UPSTREAM_SHA'
+      - 'patches/**'
+  push:
+    branches:
+      - sync
+    paths:
+      - '.github/UPSTREAM_SHA'
+      - 'patches/**'
+
+concurrency:
+  group: sync-main
+  cancel-in-progress: false
+
+jobs:
+  apply-sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout sync branch
+        uses: actions/checkout@v7
+        with:
+          path: sync-branch
+
+      - name: Read upstream SHA
+        id: upstream
+        run: |
+          sha=$(tr -d '[:space:]' < sync-branch/.github/UPSTREAM_SHA)
+          if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "UPSTREAM_SHA does not contain a valid 40-char sha: '$sha'"
+            exit 1
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      # A second checkout of the default branch. Its only purpose is to have
+      # 'origin' wired up with the right auth for the final push; its content
+      # is thrown away as soon as we reset to the upstream SHA below. The sync
+      # branch clone holds the patches we apply here, so it must stay intact.
+      - name: Checkout default branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: target-branch
+
+      - name: Reset default branch to upstream SHA
+        working-directory: target-branch
+        env:
+          UPSTREAM_SHA: ${{ steps.upstream.outputs.sha }}
+        run: |
+          git remote add upstream https://github.com/withastro/astro.git
+          git fetch --depth 1 upstream "$UPSTREAM_SHA"
+          git checkout "$UPSTREAM_SHA"
+
+      - name: Apply patches
+        working-directory: target-branch
+        run: bash ../sync-branch/.github/scripts/apply-patches.sh
+
+      - name: Force push default branch
+        if: github.event_name == 'push'
+        working-directory: target-branch
+        run: git push --force origin HEAD:refs/heads/${{ github.event.repository.default_branch }}
