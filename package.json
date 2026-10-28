@@ -14,5 +14,8 @@
   },
   "dependencies": {
     "astro": "^7.4.4"
+  },
+  "devDependencies": {
+    "@astrojs/ts-plugin": "*"
   }
 }
